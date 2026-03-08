@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import math
 import re
 from html import unescape
 from io import BytesIO
@@ -192,7 +191,9 @@ async def find_smart_cut(
 ) -> int:
     target = current_y + content_h
     lo = max(current_y + args.min_segment_height, target - args.search_range)
-    hi = min(full_height, target + args.search_range)
+    # We cannot cut beyond target in content-space because each slice can only
+    # carry `content_h`; searching above target is wasted work.
+    hi = min(full_height, target)
     if hi - lo < 8:
         return min(full_height, target)
 
@@ -374,6 +375,10 @@ def main() -> int:
         return 1
     if args.slice_padding * 2 >= args.height:
         print("slice-padding is too large for current height")
+        return 1
+    content_h = args.height - 2 * args.slice_padding
+    if args.min_segment_height > content_h:
+        print("min-segment-height must be <= content_height (height - 2*slice-padding)")
         return 1
 
     out_dir, page_count = asyncio.run(export_pages(args))
