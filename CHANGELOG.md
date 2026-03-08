@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.1] - 2026-03-09
+
+### Fixed
+
+- Resolved smart-cut vs slice-padding conflict in `html_to_image.py`.
+  - Root cause:
+    - Cut-step should follow `content_h = height - 2*slice_padding`.
+    - Canvas/output height should remain `height`.
+    - When these two were mixed, next-slice top spacing could look inconsistent.
+  - Debugged and fixed flow:
+    - Added/confirmed `--slice-padding` and content-height based stepping.
+    - Ensured `find_smart_cut` targets `current_y + content_h`.
+    - Kept screenshot pasted into white canvas with Y offset `pad * supersample`.
+    - Tightened smart-cut search window upper bound to `target` (removed ineffective upper-half search).
+    - Added validation: `min_segment_height <= content_h`.
+    - Removed unused `math` import.
+  - Verification:
+    - Re-ran full pipeline and confirmed fixed-size output (`1400x2400`) and stable slice spacing.
+
 ## [1.0.0] - 2026-03-09
 
 ### Added
