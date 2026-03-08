@@ -1,0 +1,65 @@
+/* ===== 基础页面 ===== */
+body {
+  width: 1440px;           /* 固定页宽，和原图一致 */
+  margin: 0 auto;
+  padding: 80px 30px;     /* 上下留白 / 左右边距 */
+  background: #ffffff;
+  font-family: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  font-size: 54px;         /* 适合 1440px 宽度的阅读字号 */
+  line-height: 1.85;
+  color: #1a1a1a;
+  box-sizing: border-box;
+  word-break: break-word;
+}
+
+/* ===== 段落 ===== */
+p {
+  margin: 0 0 48px 0;
+}
+
+/* ===== 有序列表（蓝色编号） ===== */
+ol {
+  padding-left: 0;
+  list-style: none;
+  counter-reset: item;
+  margin: 0 0 48px 0;
+}
+
+ol li {
+  counter-increment: item;
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+ol li::before {
+  content: counter(item) ".";
+  color: #3d7eff;
+  font-weight: 700;
+  font-size: 42px;
+  min-width: 56px;
+  flex-shrink: 0;
+}
+
+/* ===== 引用块（左边框 + 蓝色文字） ===== */
+blockquote {
+  border-left: 8px solid #3d7eff;
+  margin: 0 0 48px 0;
+  padding: 16px 0 16px 40px;
+  color: #3d7eff;
+  font-size: 42px;
+}
+
+/* ===== 标题（如需要） ===== */
+h1.page-title,
+.page-title {
+  font-size: 76px !important;
+  font-weight: 700 !important;
+  line-height: 1.18 !important;
+  margin: 0 0 64px 0 !important;
+}
+
+h1:not(.page-title) { font-size: 64px !important; font-weight: 700; margin: 0 0 64px 0; }
+h2 { font-size: 52px !important; font-weight: 700; margin: 0 0 48px 0; }
+h3 { font-size: 46px !important; font-weight: 600; margin: 0 0 40px 0; }
