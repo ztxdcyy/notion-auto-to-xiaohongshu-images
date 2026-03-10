@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0] - 2026-03-10
+
+### Changed
+
+- Live preview file location moved from export output folders to project root:
+  - `preview_live.html` is now generated next to `html_to_image.py`.
+  - Preview page now loads slices via absolute `file://` URI of the current output directory.
+- Export startup behavior:
+  - Browser auto-opens project preview page as soon as export begins.
+  - Old `preview_live.html` in output folders is removed to avoid confusion.
+- Default render quality:
+  - CLI default `--supersample` increased from `4.0` to `5.0`.
+  - `argparse` help now shows parameter defaults directly.
+- Visual theme:
+  - Reverted `my.css` base background from Morandi palette back to white (`#ffffff`).
+
 ## [1.0.1] - 2026-03-09
 
 ### Fixed
