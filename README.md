@@ -46,10 +46,22 @@
 ./run_html_pipeline.sh 121/备用安卓机的好去处😄.html
 ```
 
+Windows（`cmd`）：
+
+```bat
+run_html_pipeline.bat 121\备用安卓机的好去处😄.html
+```
+
 如果要指定 CSS 文件：
 
 ```bash
 ./run_html_pipeline.sh 121/备用安卓机的好去处😄.html /Users/tim/Downloads/my.css
+```
+
+Windows（`cmd`）：
+
+```bat
+run_html_pipeline.bat 121\备用安卓机的好去处😄.html D:\path\to\my.css
 ```
 
 ### 4) 查看输出
@@ -71,7 +83,9 @@
 ```text
 html_to_image.py          # 渲染+切分主脚本
 insert_css_into_html.py   # 往 HTML 注入 CSS link
-run_html_pipeline.sh      # 一键流水线（推荐入口）
+run_html_pipeline.py      # 跨平台一键流水线主入口
+run_html_pipeline.sh      # macOS/Linux 启动器
+run_html_pipeline.bat     # Windows 启动器
 my.css                    # 默认样式模板
 requirements.txt
 ```
@@ -86,7 +100,7 @@ python3 -m playwright install chromium
 ## 常用参数（`html_to_image.py`）
 
 - `--width` / `--height`：输出尺寸（默认 `1400x2400`）
-- `--supersample`：超采样倍率（默认 `4.0`）
+- `--supersample`：超采样倍率（默认 `5.0`）
 - `--side-padding`：页面左右内边距（样式层）
 - `--top-padding` / `--bottom-padding`：页面上下内边距（样式层）
 - `--slice-padding`：每张切图上下留白（切图层，默认 `80`）
@@ -99,5 +113,6 @@ python3 -m playwright install chromium
 ## 说明
 
 - `insert_css_into_html.py` 是幂等的：相同 CSS link 已存在时会自动跳过。
+- `run_html_pipeline.py` 会自动计算 CSS 相对路径；`sh/bat` 只是平台启动器。
 - 输出图片始终固定尺寸（默认每张 `1400x2400`）。
 - 智能切分主要优化纵向切点；横向观感主要由 CSS 控制。

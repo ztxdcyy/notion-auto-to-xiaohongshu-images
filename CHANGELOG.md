@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.1] - 2026-03-10
+
+### Added
+
+- Windows-compatible pipeline launcher:
+  - Added `run_html_pipeline.bat` for `cmd` usage.
+  - Added `run_html_pipeline.py` as cross-platform pipeline core.
+
+### Changed
+
+- Refactored `run_html_pipeline.sh` into a thin launcher that delegates to
+  `run_html_pipeline.py` (same behavior on macOS/Linux, easier parity with Windows).
+- Updated README usage examples and project structure to include `.bat` + `.py`
+  pipeline entrypoints.
+
 ## [1.1.0] - 2026-03-10
 
 ### Changed
