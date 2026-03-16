@@ -2,6 +2,49 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.1] - 2026-03-16
+
+### Changed
+
+- Web size presets are now fixed to two templates only:
+  - `1200x1600` (3:4)
+  - `1440x2400` (full-screen open style)
+- Removed ratio-based/custom height calculation flow in frontend:
+  - no `custom`
+  - no computed height from ratio
+  - width/height are now preset-driven and read-only in UI.
+- Backend now enforces preset-driven output size when building `html_to_image.py` args
+  (does not rely on user-entered width/height).
+
+## [1.2.0] - 2026-03-16
+
+### Added
+
+- Introduced a local `Web App` flow for macOS-first usage:
+  - Added `web_app.py` (FastAPI backend) with preview/export task APIs.
+  - Added `web/` frontend UI:
+    - left parameter panel
+    - center full-document preview (PDF-like vertical browsing)
+    - right task status + logs
+- Added preview/export task lifecycle APIs:
+  - `POST /api/preview`
+  - `POST /api/export`
+  - `GET /api/task/{task_id}`
+  - `POST /api/open-output/{task_id}`
+- Added web dependencies to `requirements.txt`: `fastapi`, `uvicorn[standard]`.
+
+### Changed
+
+- `html_to_image.py` now supports:
+  - `--max-pages` (advanced fallback switch, default full document)
+  - `--no-open-preview` (for backend-driven runs without browser pop-up)
+- Web UI now includes export ratio presets:
+  - `3:4`
+  - `9:16`
+  - `custom` (manual width/height)
+  - preview card aspect ratio follows selected output ratio.
+- Updated README with Web App startup instructions and architecture notes.
+
 ## [1.1.1] - 2026-03-10
 
 ### Added

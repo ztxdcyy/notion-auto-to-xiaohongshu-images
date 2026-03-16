@@ -4,3 +4,4 @@ __pycache__/
 images_*/
 output_images*/
 preview_live.html
+.web_runs/

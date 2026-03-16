@@ -1,2 +1,4 @@
 playwright
 Pillow
+fastapi
+uvicorn[standard]

@@ -1,12 +1,33 @@
 # Notion自动转小红书图片
 
-把 Notion 文章导出成 `HTML` 后，自动转换为适合手机阅读与发布的小红书图片（默认 `1400x2400`）。
+把 Notion 文章导出成 `HTML` 后，自动转换为适合手机阅读与发布的小红书图片（Web 端预设支持 `1200x1600` 与 `1440x2400`）。
 
 核心目标：
 
 - 固定图片尺寸，保证发帖排版稳定
 - 智能切分，尽量避免切断正文
 - 自动套用自定义 CSS，统一字体、边距和标题样式
+
+## Web App（推荐给非技术用户）
+
+本项目已提供本地 Web 界面，支持：
+
+- 导出前全文预览（像 PDF 一样纵向浏览）
+- 参数面板可视化调节
+- 固定尺寸预设（`1200x1600` / `1440x2400`）
+- 一键触发高清导出
+
+启动：
+
+```bash
+uv run web_app.py
+```
+
+浏览器访问：
+
+```text
+http://127.0.0.1:8123
+```
 
 ## 整套 Pipeline
 
@@ -82,6 +103,8 @@ run_html_pipeline.bat 121\备用安卓机的好去处😄.html D:\path\to\my.css
 
 ```text
 html_to_image.py          # 渲染+切分主脚本
+web_app.py                # Web App 后端（FastAPI）
+web/                      # Web App 前端静态页面
 insert_css_into_html.py   # 往 HTML 注入 CSS link
 run_html_pipeline.py      # 跨平台一键流水线主入口
 run_html_pipeline.sh      # macOS/Linux 启动器
@@ -93,9 +116,12 @@ requirements.txt
 ## 安装依赖
 
 ```bash
-python3 -m pip install -r requirements.txt
-python3 -m playwright install chromium
+uv venv .venv
+uv pip install -r requirements.txt
+uv run playwright install chromium
 ```
+
+> 如未安装 `uv`，先执行：`curl -LsSf https://astral.sh/uv/install.sh | sh`
 
 ## 常用参数（`html_to_image.py`）
 
@@ -114,5 +140,6 @@ python3 -m playwright install chromium
 
 - `insert_css_into_html.py` 是幂等的：相同 CSS link 已存在时会自动跳过。
 - `run_html_pipeline.py` 会自动计算 CSS 相对路径；`sh/bat` 只是平台启动器。
-- 输出图片始终固定尺寸（默认每张 `1400x2400`）。
+- `web_app.py` 里预览与导出共用同一分页逻辑，预览只降低渲染成本，不改变切分规则。
+- Web 界面仅支持两个固定尺寸预设：`1200x1600` 与 `1440x2400`。
 - 智能切分主要优化纵向切点；横向观感主要由 CSS 控制。

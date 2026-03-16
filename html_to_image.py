@@ -103,6 +103,17 @@ def parse_args() -> argparse.Namespace:
         default=80,
         help="Top/bottom white padding added to each output slice (px)",
     )
+    parser.add_argument(
+        "--max-pages",
+        type=int,
+        default=0,
+        help="Maximum pages to export (0 means no limit)",
+    )
+    parser.add_argument(
+        "--no-open-preview",
+        action="store_true",
+        help="Do not auto-open preview page in browser",
+    )
     return parser.parse_args()
 
 
@@ -413,13 +424,16 @@ async def export_pages(args: argparse.Namespace) -> tuple[Path, int, Path]:
         width=args.width,
         height=args.height,
     )
-    try:
-        if webbrowser.open(preview_path.as_uri(), new=1):
-            print(f"Preview opened in browser: {preview_path}")
-        else:
-            print(f"Preview ready (open manually if needed): {preview_path}")
-    except Exception as exc:
-        print(f"Warning: failed to auto-open preview: {exc}")
+    if args.no_open_preview:
+        print(f"Preview ready: {preview_path}")
+    else:
+        try:
+            if webbrowser.open(preview_path.as_uri(), new=1):
+                print(f"Preview opened in browser: {preview_path}")
+            else:
+                print(f"Preview ready (open manually if needed): {preview_path}")
+        except Exception as exc:
+            print(f"Warning: failed to auto-open preview: {exc}")
 
     async with async_playwright() as p:
         browser = await p.chromium.launch()
@@ -510,6 +524,8 @@ async def export_pages(args: argparse.Namespace) -> tuple[Path, int, Path]:
             final_img.save(out_dir / f"page_{idx + 1:03d}.png", "PNG")
             idx += 1
             y = cut
+            if args.max_pages > 0 and idx >= args.max_pages:
+                break
 
         await browser.close()
 
@@ -550,6 +566,9 @@ def main() -> int:
         return 1
     if args.slice_padding * 2 >= args.height:
         print("slice-padding is too large for current height")
+        return 1
+    if args.max_pages < 0:
+        print("max-pages must be >= 0")
         return 1
     content_h = args.height - 2 * args.slice_padding
     if args.min_segment_height > content_h:
