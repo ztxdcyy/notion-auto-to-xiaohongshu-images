@@ -2,3 +2,4 @@ playwright
 Pillow
 fastapi
 uvicorn[standard]
+python-multipart

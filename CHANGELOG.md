@@ -2,6 +2,70 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] - 2026-03-17
+
+### Added
+
+- Cloud-friendly source upload workflow:
+  - Added `POST /api/upload-source` (accepts `.zip` or `.html`, optional `.css`).
+  - Added server-side `source_id` lifecycle and source metadata persistence under `.web_runs/sources/`.
+- Frontend upload UX enhancements:
+  - Large drag-and-drop upload zone.
+  - Click-to-select upload entry.
+  - Visual upload progress bar with percentage.
+- Runtime fallback for parameter tooltip metadata in frontend:
+  - Added inline fallback metadata for key params.
+  - Added `cache: "no-store"` fetch policy for `/static/param_meta.json`.
+- Added dependency `python-multipart` for FastAPI multipart upload handling.
+
+### Changed
+
+- Request model for preview/export switched from local path mode to upload mode:
+  - `RunRequest` now uses `source_id` instead of `html_path/css_path`.
+- Frontend information architecture updates:
+  - Top-left main title now reflects uploaded HTML `<title>`.
+  - Upload block renamed and simplified.
+  - Primary theme color switched to Hermes-like orange.
+  - Merged quality controls (preview/export supersample + sharpen) into `导出图片选项`.
+  - Restored `切分策略选项` as a collapsible module.
+- Frontend payload construction now includes visible quality/splitting controls while keeping safe defaults.
+- Startup behavior tuned for local + cloud:
+  - `PORT` and `WEBAPP_HOST` respected in `web_app.py` main entry.
+  - Browser auto-open only triggers for local host modes.
+- Visual style system refresh for exported images:
+  - Main title scale increased significantly for cover-like reading effect.
+  - `<hr>` divider switched from gradient to solid theme color.
+  - Core accents in `my.css` now derive from CSS variable `--theme-color`.
+- Added configurable theme color in `导出图片选项`:
+  - Preset palette includes classic blue and Morandi options.
+  - Added color picker for custom accent selection.
+  - Theme color now flows from Web UI -> backend settings -> `html_to_image.py`.
+
+### Removed
+
+- Removed local absolute-path dependent Web UI flow:
+  - Removed `HTML 路径` / `CSS 路径` inputs from frontend.
+  - Removed `/api/pick-html` endpoint (Finder/tkinter picker).
+  - Removed `/api/open-output/{task_id}` endpoint (local file manager opener).
+- Removed legacy local packaging pipeline entry scripts that diverged from current Web App workflow:
+  - `run_html_pipeline.py`
+  - `run_html_pipeline.sh`
+  - `run_html_pipeline.bat`
+- Removed legacy CLI-only live preview branch in `html_to_image.py`:
+  - Removed generation/opening of `preview_live.html`.
+  - Removed `--no-open-preview` CLI argument.
+
+### Fixed
+
+- Tooltip regression in split-strategy parameters:
+  - Ensured question-mark tooltip visibility even when static JSON loading fails.
+- Empty UI default value issues:
+  - Added/retained frontend fallback defaults to avoid blank parameter inputs.
+- Todo duplicate checkbox rendering:
+  - Hidden Notion built-in `.checkbox` and retained single custom checkbox style in `my.css`.
+- Backward compatibility for mixed old/new workers:
+  - Re-accepted legacy `--no-open-preview` arg as no-op in `html_to_image.py` to avoid `Command failed with code 2`.
+
 ## [1.2.1] - 2026-03-16
 
 ### Changed

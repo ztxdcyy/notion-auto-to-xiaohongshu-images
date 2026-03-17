@@ -1,101 +1,127 @@
-# Web App Plan (macOS First) - Updated 2026-03-16
+# Web App Plan (macOS First)
 
-## 1. Product Direction (Locked)
+## 1. 项目定位（已定）
 
-- Product form: `Web App` (not packaged local app).
-- Target users: non-technical users, minimal command-line usage.
-- Core flow: Notion export HTML -> preview in browser -> high-quality export.
+- 产品形态：`Web App`（不是本地打包 App）。
+- 目标用户：技术小白，开箱即用，尽量少命令行。
+- 当前阶段：先在 macOS 跑通并打磨体验，再考虑跨平台部署细节。
 
-## 2. Core Experience (Locked)
+## 2. 核心目标
 
-- Input: `HTML + CSS`.
-- Output: mobile-readable images.
-- Two-stage workflow:
-  1. `Preview`: full-document preview, fast low-cost render.
-  2. `Export`: full-document high-quality render.
-- Preview and export must share the same pagination logic.
+- 输入：`HTML + CSS`（Notion 导出）。
+- 输出：适合手机阅读的高清图片（固定 `1400x2400`）。
+- 关键体验：
+  - 导出前可调参数、可预览。
+  - 预览必须有决策价值（不是“已导出结果回看”）。
+  - 正式导出质量稳定、可复现。
 
-## 3. Decision Notes (Locked)
+## 3. 产品交互决策（强约束）
 
-- Preview must be full-document; not "first N pages only" as default behavior.
-- `max-pages` is only an advanced fallback/debug switch.
-- Ratio presets must be first-class in UI: `3:4`, `9:16`, `custom`.
-- Preview container should be fixed shell + inner scroll.
+### 3.1 两阶段工作流
 
-## 4. Current Implementation Status
+1. `预览阶段（Preview）`
+- 全文分页预览（不是只看前几页）。
+- 使用低成本渲染参数（低 supersample）提升响应速度。
+- 分页算法与正式导出一致，确保“所见即所得”。
 
-## 4.1 Backend (`web_app.py`) - Completed
+2. `导出阶段（Export）`
+- 使用高质量参数（高清 supersample + sharpen）正式输出。
+- 输出目录仍为 `images_<post_title>`。
 
-- Added API endpoints:
-  - `POST /api/preview`
-  - `GET /api/preview/pages`
-  - `POST /api/export`
-  - `GET /api/task/{task_id}`
-  - `POST /api/open-output/{task_id}`
-  - `GET /api/pick-html`
-- Preview/export task execution is async (threaded) with status + logs in memory.
-- macOS file picker now uses native Finder dialog via `osascript` (more stable than tkinter in this app context).
+### 3.2 关于 max-pages 的结论
 
-## 4.2 Render Engine (`html_to_image.py`) - Completed
+- `max-pages` 不能作为预览主策略。
+- 预览默认必须是“全文预览”。
+- `max-pages` 仅保留为高级调试/兜底开关（超长文或性能紧急场景）。
 
-- Added `--no-open-preview` for backend-driven runs.
-- Added `--max-pages` as advanced fallback switch.
-- Retained same pagination/cut logic for both preview and export workflows.
+## 4. 前端信息架构（页面必须包含）
 
-## 4.3 Frontend (`web/`) - Completed
+### 4.1 左侧：参数面板
 
-- Three-column UI:
-  - left: parameter panel
-  - center: full-document preview
-  - right: task summary/actions
-- Ratio preset UI:
-  - `3:4` / `9:16` / `custom`
-  - preset auto-computes `height` from `width`
-  - preview frame aspect ratio follows selected output ratio
-- Preview shell behavior:
-  - fixed outer shell
-  - inner vertical scroll
-- File import UX:
-  - drag-and-drop HTML into dropzone
-  - click button to open Finder and select HTML
-- Log panel hidden from UI; only concise task notes/status shown.
+- 文件输入：
+  - HTML 路径
+  - CSS 路径
+- 布局参数：
+  - side/top/bottom padding
+  - 基础字号（若由 CSS 控制则仅提示）
+- 切分参数：
+  - slice-padding
+  - cut-mode
+  - search-range
+  - min-segment-height
+  - white-threshold
+  - white-row-ratio
+- 清晰度参数：
+  - supersample
+  - sharpen
 
-## 5. UX Rules (Do Not Regress)
+### 4.2 中间：主预览区（核心）
 
-- Keep the center preview panel fixed; avoid page-level vertical jumpiness on desktop.
-- Keep preview cards centered in the preview viewport.
-- Do not reintroduce verbose log panel unless explicitly requested.
-- Preserve low-friction import:
-  - drag-drop first
-  - native file picker as fallback/primary for non-technical users.
+- 像 PDF 一样纵向浏览分页结果。
+- 每页比例固定 `1400:2400`。
+- 支持滚动浏览全文，不依赖“前几页样张”。
+- 长文必须用虚拟列表/懒加载避免卡顿。
 
-## 6. Milestones
+### 4.3 右侧：任务与统计
 
-1. `M1` Basic web app skeleton and API connection - Completed.
-2. `M2` Full-document preview experience - Completed (base version).
-3. `M3` Export workflow robustness - In progress.
-4. `M4` UX polish + onboarding copy - Pending.
+- 预计页数、耗时估计（可粗略）。
+- 参数摘要（当前 preset）。
+- 操作按钮：
+  - 生成预览
+  - 开始高清导出
+  - 打开输出目录
 
-## 7. Next Work Items (Priority)
+## 5. 技术实现路线
 
-1. Improve task progress visibility (lightweight progress model instead of only status text).
-2. Add preset bundles for beginners (e.g., "小红书 3:4", "手机长图 9:16").
-3. Add preview caching/versioning to avoid stale-image confusion after parameter changes.
-4. Add stronger validation and inline error hints for path/parameter issues.
-5. Add one-click "open recent html" history for repeat workflows.
+## 5.1 架构
 
-## 8. Done Criteria
+- `Backend`：Python 本地服务（HTTP API）。
+- `Frontend`：单页 Web 界面（参数、预览、导出进度）。
+- `Engine`：复用现有 `html_to_image.py` 分页逻辑，避免两套算法漂移。
 
-- Non-technical user can finish one full run from HTML selection to final export inside web UI.
-- Preview reflects full-document pagination and is visually aligned with export behavior.
-- Ratio presets (`3:4`, `9:16`) work end-to-end in both preview and export.
-- Export result remains stable and reproducible.
+### 5.2 关键原则
 
-## 9. Anti-Drift Checklist (Before Every Change)
+- 预览与导出共用同一分页逻辑。
+- 预览只降渲染质量，不改分页规则。
+- 高质量导出前，前端应展示“当前参数快照”。
 
-- Is this still a `Web App` first flow?
-- Is preview still full-document (not sample-only)?
-- Is pagination logic still shared between preview/export?
-- Did we keep the center preview shell fixed with inner scrolling?
-- Did we avoid exposing unnecessary complexity to beginner users?
+### 5.3 接口草案（第一版）
+
+- `POST /api/preview`
+  - 生成全文低成本预览图（可覆盖旧预览）。
+- `GET /api/preview/pages`
+  - 返回预览页列表与状态。
+- `POST /api/export`
+  - 启动高清导出任务。
+- `GET /api/task/{id}`
+  - 查询任务进度、日志、错误。
+
+## 6. UI 风格要求（整洁美观）
+
+- 视觉基调：白底、中性灰、单强调色。
+- 字体：`SF Pro + PingFang SC`。
+- 布局：三栏，信息密度适中，留白清晰。
+- 动效：仅必要反馈（加载、进度、成功/失败）。
+
+## 7. 分阶段里程碑
+
+1. `M1`：页面骨架 + 参数表单 + 后端连通（可触发 preview）。
+2. `M2`：全文预览可滚动浏览（虚拟列表 + 懒加载）。
+3. `M3`：高清导出任务流（开始/进度/完成/错误）。
+4. `M4`：交互与视觉打磨（空态、异常态、引导文案）。
+
+## 8. 验收标准（Definition of Done）
+
+- 不会写命令行的用户可以完成一次从 HTML 到图片导出。
+- 预览可浏览全文，且与正式导出分页一致。
+- 导出结果固定 `1400x2400`，清晰度达到当前基线。
+- 参数修改后能在预览中快速反映。
+
+## 9. 防偏移检查清单（每次设计/编码前必看）
+
+- 是否仍然是 `Web App` 而不是打包 App？
+- 预览是否为“全文预览”而非“前几页截样”？
+- 预览和正式导出是否共用同一分页逻辑？
+- 是否把高阶参数藏在合适层级，避免吓到小白用户？
+- 输出是否仍固定 `1400x2400`？
 

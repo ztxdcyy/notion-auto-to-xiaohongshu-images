@@ -1,31 +1,30 @@
 const $ = (id) => document.getElementById(id);
 
 const dom = {
-  htmlPath: $("htmlPath"),
-  htmlDropzone: $("htmlDropzone"),
-  btnPickHtml: $("btnPickHtml"),
-  cssPath: $("cssPath"),
+  postTitle: $("postTitle"),
+  sourceDropzone: $("sourceDropzone"),
+  sourceFile: $("sourceFile"),
+  btnPickSource: $("btnPickSource"),
+  uploadProgressWrap: $("uploadProgressWrap"),
+  uploadProgressFill: $("uploadProgressFill"),
+  uploadProgressText: $("uploadProgressText"),
+  sourceMeta: $("sourceMeta"),
   sizePreset: $("sizePreset"),
   ratioHint: $("ratioHint"),
-  width: $("width"),
-  height: $("height"),
-  sidePadding: $("sidePadding"),
-  topPadding: $("topPadding"),
-  bottomPadding: $("bottomPadding"),
-  slicePadding: $("slicePadding"),
+  previewSupersample: $("previewSupersample"),
+  exportSupersample: $("exportSupersample"),
+  exportSharpen: $("exportSharpen"),
+  themePreset: $("themePreset"),
+  themeColor: $("themeColor"),
   cutMode: $("cutMode"),
   searchRange: $("searchRange"),
   minSegHeight: $("minSegHeight"),
   whiteThreshold: $("whiteThreshold"),
   whiteRowRatio: $("whiteRowRatio"),
   waitMs: $("waitMs"),
-  previewSupersample: $("previewSupersample"),
-  exportSupersample: $("exportSupersample"),
-  exportSharpen: $("exportSharpen"),
   globalStatus: $("globalStatus"),
   btnPreview: $("btnPreview"),
   btnExport: $("btnExport"),
-  btnOpenOutput: $("btnOpenOutput"),
   taskKind: $("taskKind"),
   taskState: $("taskState"),
   taskPages: $("taskPages"),
@@ -36,10 +35,93 @@ const dom = {
 
 let pollTimer = null;
 let activeTaskId = null;
-let latestExportTaskId = null;
+let activeSourceId = null;
+let uploadingSource = false;
+
 const sizePresetMap = {
   "1200x1600": [1200, 1600],
   "1440x2400": [1440, 2400],
+};
+
+const themePresetMap = {
+  classic_blue: "#3d7eff",
+  morandi_sage: "#8c9a8e",
+  morandi_bluegray: "#7e8f9f",
+  morandi_rose: "#b58f8a",
+  morandi_khaki: "#b9a99a",
+};
+
+const uiFallbackDefaults = {
+  size_preset: "1440x2400",
+  width: 1440,
+  height: 2400,
+  side_padding: 56,
+  top_padding: 64,
+  bottom_padding: 72,
+  slice_padding: 80,
+  cut_mode: "smart",
+  search_range: 220,
+  min_segment_height: 1500,
+  white_threshold: 245,
+  white_row_ratio: 0.992,
+  wait_ms: 800,
+  preview_supersample: 1.2,
+  export_supersample: 5.0,
+  export_sharpen: 120,
+  theme_color: "#3d7eff",
+};
+
+const inlineParamMetaFallback = {
+  params: {
+    cutMode: {
+      label: "切分模式",
+      help: "智能切分会优先在空白行附近落刀；硬切分按固定高度直接切。",
+    },
+    searchRange: {
+      label: "搜索范围(px)",
+      help: "智能切分在目标切点附近搜索空白行的范围。越大越容易找到自然断点，但更耗时。",
+    },
+    minSegHeight: {
+      label: "最小分段高度(px)",
+      help: "限制每段最小内容高度，避免切得过碎。",
+    },
+    whiteThreshold: {
+      label: "空白阈值",
+      help: "像素灰度阈值（0-255）。越高越严格地判定“白色”。",
+    },
+    whiteRowRatio: {
+      label: "空白行比例",
+      help: "一行中达到空白阈值像素的比例。越接近 1，越要求整行接近空白。",
+    },
+    waitMs: {
+      label: "额外等待(ms)",
+      help: "页面加载后额外等待时间，用于让字体和图片稳定渲染。",
+    },
+    previewSupersample: {
+      label: "预览清晰度(倍率)",
+      help: "预览阶段渲染倍率。越高预览越清晰，但速度更慢。",
+    },
+    exportSupersample: {
+      label: "导出清晰度(倍率)",
+      help: "正式导出渲染倍率。越高越清晰，也更耗时和资源。",
+    },
+    exportSharpen: {
+      label: "导出锐化强度",
+      help: "导出后锐化强度。0 表示不锐化。",
+    },
+    themePreset: {
+      label: "主题色预设",
+      help: "可选经典蓝与莫兰迪色系预设。选择后会自动同步到取色器。",
+    },
+    themeColor: {
+      label: "主题色取色器",
+      help: "支持手动选色。若颜色不在预设里，预设会自动切换为“自定义”。",
+    },
+    sizePreset: {
+      label: "尺寸预设",
+      help: "固定为两种模板：1200x1600（3:4 常规图文）与 1440x2400（满屏打开）。",
+    },
+  },
 };
 
 function setGlobalStatus(status, text) {
@@ -47,9 +129,33 @@ function setGlobalStatus(status, text) {
   dom.globalStatus.textContent = text;
 }
 
+function getPresetSize() {
+  return sizePresetMap[dom.sizePreset.value] || sizePresetMap["1440x2400"];
+}
+
+function normalizeHexColor(value) {
+  const raw = String(value || "").trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(raw)) return raw.toLowerCase();
+  return uiFallbackDefaults.theme_color;
+}
+
+function detectThemePreset(color) {
+  const normalized = normalizeHexColor(color);
+  for (const [preset, hex] of Object.entries(themePresetMap)) {
+    if (hex.toLowerCase() === normalized) {
+      return preset;
+    }
+  }
+  return "custom";
+}
+
+function syncThemePresetFromColor() {
+  if (!dom.themePreset || !dom.themeColor) return;
+  dom.themePreset.value = detectThemePreset(dom.themeColor.value);
+}
+
 function syncPageAspect() {
-  const w = Math.max(1, Number(dom.width.value) || 1);
-  const h = Math.max(1, Number(dom.height.value) || 1);
+  const [w, h] = getPresetSize();
   dom.pages.style.setProperty("--page-aspect", `${w} / ${h}`);
 }
 
@@ -58,13 +164,29 @@ function disableActions(disabled) {
   dom.btnExport.disabled = disabled;
 }
 
-async function loadParamMeta() {
-  try {
-    const resp = await fetch("/static/param_meta.json");
-    if (!resp.ok) return;
-    const meta = await resp.json();
-    const params = meta?.params || {};
+function setUploadProgress(percent) {
+  const val = Math.max(0, Math.min(100, Math.round(percent)));
+  dom.uploadProgressWrap.classList.remove("hidden");
+  dom.uploadProgressWrap.setAttribute("aria-hidden", "false");
+  dom.uploadProgressFill.style.width = `${val}%`;
+  dom.uploadProgressText.textContent = `${val}%`;
+}
 
+function setUploadingUI(isUploading) {
+  uploadingSource = isUploading;
+  dom.btnPickSource.disabled = isUploading;
+  dom.sourceDropzone.classList.toggle("is-uploading", isUploading);
+  dom.sourceDropzone.setAttribute("aria-busy", isUploading ? "true" : "false");
+}
+
+function showError(err) {
+  const msg = String(err || "Error");
+  setGlobalStatus("error", msg.length > 60 ? `${msg.slice(0, 57)}...` : msg);
+}
+
+async function loadParamMeta() {
+  const applyMeta = (meta) => {
+    const params = meta?.params || {};
     document.querySelectorAll(".param-label[data-param-key]").forEach((label) => {
       const key = label.dataset.paramKey;
       const cfg = params[key];
@@ -72,78 +194,34 @@ async function loadParamMeta() {
       const helpDot = label.querySelector(".help-dot");
       if (!helpDot) return;
 
-      // Default policy: no help => no question mark.
       helpDot.style.display = "none";
       helpDot.removeAttribute("data-tip");
       helpDot.removeAttribute("title");
 
       if (!cfg) return;
-
       if (titleEl && typeof cfg.label === "string" && cfg.label.trim()) {
         titleEl.textContent = cfg.label.trim();
       }
 
       const help = typeof cfg.help === "string" ? cfg.help.trim() : "";
-      if (!help) {
-        helpDot.style.display = "none";
-      } else {
-        helpDot.style.display = "inline-flex";
-        helpDot.dataset.tip = help;
-        helpDot.title = help;
-      }
+      if (!help) return;
+      helpDot.style.display = "inline-flex";
+      helpDot.dataset.tip = help;
+      helpDot.title = help;
     });
+  };
+
+  try {
+    const resp = await fetch("/static/param_meta.json", { cache: "no-store" });
+    if (!resp.ok) {
+      applyMeta(inlineParamMetaFallback);
+      return;
+    }
+    const meta = await resp.json();
+    applyMeta({ ...inlineParamMetaFallback, ...meta, params: { ...inlineParamMetaFallback.params, ...(meta?.params || {}) } });
   } catch {
-    // ignore metadata load failure and keep inline labels as fallback
+    applyMeta(inlineParamMetaFallback);
   }
-}
-
-function collectSettings() {
-  return {
-    size_preset: dom.sizePreset.value,
-    width: Number(dom.width.value),
-    height: Number(dom.height.value),
-    side_padding: Number(dom.sidePadding.value),
-    top_padding: Number(dom.topPadding.value),
-    bottom_padding: Number(dom.bottomPadding.value),
-    slice_padding: Number(dom.slicePadding.value),
-    cut_mode: dom.cutMode.value,
-    search_range: Number(dom.searchRange.value),
-    min_segment_height: Number(dom.minSegHeight.value),
-    white_threshold: Number(dom.whiteThreshold.value),
-    white_row_ratio: Number(dom.whiteRowRatio.value),
-    wait_ms: Number(dom.waitMs.value),
-    preview_supersample: Number(dom.previewSupersample.value),
-    export_supersample: Number(dom.exportSupersample.value),
-    export_sharpen: Number(dom.exportSharpen.value),
-  };
-}
-
-function collectPayload() {
-  return {
-    html_path: dom.htmlPath.value.trim(),
-    css_path: dom.cssPath.value.trim() || null,
-    settings: collectSettings(),
-  };
-}
-
-function setDefaults(d) {
-  dom.sizePreset.value = d.size_preset || detectSizePreset(Number(d.width) || 0, Number(d.height) || 0);
-  dom.width.value = d.width;
-  dom.height.value = d.height;
-  dom.sidePadding.value = d.side_padding;
-  dom.topPadding.value = d.top_padding;
-  dom.bottomPadding.value = d.bottom_padding;
-  dom.slicePadding.value = d.slice_padding;
-  dom.cutMode.value = d.cut_mode;
-  dom.searchRange.value = d.search_range;
-  dom.minSegHeight.value = d.min_segment_height;
-  dom.whiteThreshold.value = d.white_threshold;
-  dom.whiteRowRatio.value = d.white_row_ratio;
-  dom.waitMs.value = d.wait_ms;
-  dom.previewSupersample.value = d.preview_supersample;
-  dom.exportSupersample.value = d.export_supersample;
-  dom.exportSharpen.value = d.export_sharpen;
-  applySizePreset();
 }
 
 function detectSizePreset(width, height) {
@@ -156,19 +234,54 @@ function detectSizePreset(width, height) {
 }
 
 function applySizePreset() {
-  const preset = dom.sizePreset.value;
-  const [width, height] = sizePresetMap[preset] || sizePresetMap["1440x2400"];
-  dom.width.value = width;
-  dom.height.value = height;
-  dom.width.disabled = true;
-  dom.height.disabled = true;
-  dom.ratioHint.textContent = `已应用固定尺寸：${width} x ${height}`;
+  const [width, height] = getPresetSize();
+  dom.ratioHint.textContent = `当前尺寸：${width} x ${height}`;
   syncPageAspect();
 }
 
-function showError(err) {
-  const msg = String(err || "Error");
-  setGlobalStatus("error", msg.length > 48 ? `${msg.slice(0, 45)}...` : msg);
+function setDefaults(d) {
+  const preset = d.size_preset || detectSizePreset(Number(d.width) || 0, Number(d.height) || 0);
+  dom.sizePreset.value = sizePresetMap[preset] ? preset : "1440x2400";
+  if (dom.previewSupersample) dom.previewSupersample.value = d.preview_supersample ?? uiFallbackDefaults.preview_supersample;
+  if (dom.exportSupersample) dom.exportSupersample.value = d.export_supersample ?? uiFallbackDefaults.export_supersample;
+  if (dom.exportSharpen) dom.exportSharpen.value = d.export_sharpen ?? uiFallbackDefaults.export_sharpen;
+  if (dom.cutMode) dom.cutMode.value = d.cut_mode ?? uiFallbackDefaults.cut_mode;
+  if (dom.searchRange) dom.searchRange.value = d.search_range ?? uiFallbackDefaults.search_range;
+  if (dom.minSegHeight) dom.minSegHeight.value = d.min_segment_height ?? uiFallbackDefaults.min_segment_height;
+  if (dom.whiteThreshold) dom.whiteThreshold.value = d.white_threshold ?? uiFallbackDefaults.white_threshold;
+  if (dom.whiteRowRatio) dom.whiteRowRatio.value = d.white_row_ratio ?? uiFallbackDefaults.white_row_ratio;
+  if (dom.waitMs) dom.waitMs.value = d.wait_ms ?? uiFallbackDefaults.wait_ms;
+  if (dom.themeColor) dom.themeColor.value = normalizeHexColor(d.theme_color ?? uiFallbackDefaults.theme_color);
+  if (dom.themePreset) dom.themePreset.value = detectThemePreset(dom.themeColor ? dom.themeColor.value : uiFallbackDefaults.theme_color);
+  applySizePreset();
+}
+
+function collectSettings() {
+  const [width, height] = getPresetSize();
+  const settings = { ...uiFallbackDefaults };
+  if (dom.previewSupersample) settings.preview_supersample = Number(dom.previewSupersample.value) || uiFallbackDefaults.preview_supersample;
+  if (dom.exportSupersample) settings.export_supersample = Number(dom.exportSupersample.value) || uiFallbackDefaults.export_supersample;
+  if (dom.exportSharpen) settings.export_sharpen = Number(dom.exportSharpen.value) || uiFallbackDefaults.export_sharpen;
+  if (dom.cutMode && (dom.cutMode.value === "smart" || dom.cutMode.value === "hard")) settings.cut_mode = dom.cutMode.value;
+  if (dom.searchRange) settings.search_range = Number(dom.searchRange.value) || uiFallbackDefaults.search_range;
+  if (dom.minSegHeight) settings.min_segment_height = Number(dom.minSegHeight.value) || uiFallbackDefaults.min_segment_height;
+  if (dom.whiteThreshold) settings.white_threshold = Number(dom.whiteThreshold.value) || uiFallbackDefaults.white_threshold;
+  if (dom.whiteRowRatio) settings.white_row_ratio = Number(dom.whiteRowRatio.value) || uiFallbackDefaults.white_row_ratio;
+  if (dom.waitMs) settings.wait_ms = Number(dom.waitMs.value) || uiFallbackDefaults.wait_ms;
+  if (dom.themeColor) settings.theme_color = normalizeHexColor(dom.themeColor.value);
+  return {
+    ...settings,
+    size_preset: dom.sizePreset.value,
+    width,
+    height,
+  };
+}
+
+function collectPayload() {
+  return {
+    source_id: activeSourceId,
+    settings: collectSettings(),
+  };
 }
 
 async function api(path, method = "GET", body = null) {
@@ -188,6 +301,66 @@ async function api(path, method = "GET", body = null) {
     throw new Error(msg);
   }
   return resp.json();
+}
+
+function uploadSourceWithProgress(file) {
+  return new Promise((resolve, reject) => {
+    const fd = new FormData();
+    fd.append("source_file", file);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/upload-source");
+    xhr.responseType = "json";
+
+    xhr.upload.onprogress = (event) => {
+      if (!event.lengthComputable) return;
+      setUploadProgress((event.loaded / event.total) * 100);
+    };
+
+    xhr.onerror = () => reject(new Error("上传失败：网络异常"));
+    xhr.onabort = () => reject(new Error("上传已取消"));
+    xhr.onload = () => {
+      const data = xhr.response;
+      if (xhr.status >= 200 && xhr.status < 300 && data) {
+        setUploadProgress(100);
+        resolve(data);
+        return;
+      }
+      const detail = data && typeof data.detail === "string" ? data.detail : `HTTP ${xhr.status}`;
+      reject(new Error(detail));
+    };
+
+    xhr.send(fd);
+  });
+}
+
+function isAllowedSourceFile(file) {
+  if (!file) return false;
+  const name = (file.name || "").toLowerCase();
+  return name.endsWith(".zip") || name.endsWith(".html") || name.endsWith(".htm");
+}
+
+async function uploadSource(file) {
+  if (uploadingSource) return;
+  if (!isAllowedSourceFile(file)) {
+    throw new Error("仅支持 .zip / .html / .htm");
+  }
+
+  setUploadingUI(true);
+  setUploadProgress(0);
+  setGlobalStatus("running", "uploading source");
+  dom.sourceMeta.textContent = "上传中";
+
+  try {
+    const data = await uploadSourceWithProgress(file);
+    activeSourceId = data.source_id;
+    dom.sourceMeta.textContent = "上传完成";
+    dom.postTitle.textContent = data.html_title || "未命名帖子";
+    setGlobalStatus("success", "source ready");
+  } finally {
+    setUploadingUI(false);
+    dom.sourceFile.value = "";
+  }
 }
 
 function renderPages(pages) {
@@ -251,9 +424,6 @@ async function pollTask(taskId) {
         if (task.kind === "preview") {
           renderPages(task.result?.pages || []);
         }
-        if (task.kind === "export") {
-          latestExportTaskId = task.id;
-        }
       } else {
         setGlobalStatus("error", `${task.kind} failed`);
         showError(task.error || "unknown error");
@@ -270,8 +440,8 @@ async function pollTask(taskId) {
 async function startTask(kind) {
   try {
     const payload = collectPayload();
-    if (!payload.html_path) {
-      throw new Error("请先填写 HTML 路径");
+    if (!payload.source_id) {
+      throw new Error("请先上传并解析源文件");
     }
 
     disableActions(true);
@@ -280,9 +450,6 @@ async function startTask(kind) {
     const endpoint = kind === "preview" ? "/api/preview" : "/api/export";
     const data = await api(endpoint, "POST", payload);
     activeTaskId = data.task_id;
-    if (kind === "export") {
-      latestExportTaskId = data.task_id;
-    }
     await pollTask(activeTaskId);
   } catch (err) {
     disableActions(false);
@@ -290,107 +457,97 @@ async function startTask(kind) {
   }
 }
 
-async function openOutputDir() {
-  try {
-    if (!latestExportTaskId) {
-      throw new Error("请先执行一次高清导出");
+function bindSourceDropzone() {
+  const dz = dom.sourceDropzone;
+  if (!dz) return;
+
+  const openPicker = () => {
+    if (!uploadingSource) {
+      dom.sourceFile.click();
     }
-    await api(`/api/open-output/${latestExportTaskId}`, "POST");
-  } catch (err) {
-    showError(err.message || String(err));
-  }
+  };
+
+  dz.addEventListener("click", (ev) => {
+    if (ev.target === dom.btnPickSource) return;
+    openPicker();
+  });
+  dz.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter" || ev.key === " ") {
+      ev.preventDefault();
+      openPicker();
+    }
+  });
+
+  dom.btnPickSource.addEventListener("click", openPicker);
+
+  dz.addEventListener("dragenter", (ev) => {
+    ev.preventDefault();
+    dz.classList.add("dragover");
+  });
+  dz.addEventListener("dragover", (ev) => {
+    ev.preventDefault();
+    dz.classList.add("dragover");
+  });
+  dz.addEventListener("dragleave", () => dz.classList.remove("dragover"));
+  dz.addEventListener("drop", async (ev) => {
+    ev.preventDefault();
+    dz.classList.remove("dragover");
+    const file = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
+    if (!file) return;
+    activeSourceId = null;
+    try {
+      await uploadSource(file);
+    } catch (err) {
+      dom.sourceMeta.textContent = "上传失败";
+      showError(err.message || String(err));
+    }
+  });
+
+  dom.sourceFile.addEventListener("change", async () => {
+    const file = dom.sourceFile.files && dom.sourceFile.files[0];
+    if (!file) return;
+    activeSourceId = null;
+    try {
+      await uploadSource(file);
+    } catch (err) {
+      dom.sourceMeta.textContent = "上传失败";
+      showError(err.message || String(err));
+    }
+  });
 }
 
 async function bootstrap() {
   try {
     setGlobalStatus("idle", "Loading");
+    setDefaults(uiFallbackDefaults);
     const data = await api("/api/config");
     setDefaults(data.defaults);
     setGlobalStatus("idle", "Idle");
-  } catch (err) {
-    showError(err.message || String(err));
+  } catch {
+    setDefaults(uiFallbackDefaults);
+    setGlobalStatus("idle", "Idle");
   }
-}
-
-async function pickHtmlByDialog() {
-  try {
-    const data = await api("/api/pick-html");
-    if (data.path) {
-      dom.htmlPath.value = data.path;
-      setGlobalStatus("idle", "HTML selected");
-    }
-  } catch (err) {
-    showError(err.message || String(err));
-  }
-}
-
-function pathFromUri(uri) {
-  if (!uri) return "";
-  const clean = uri.split("\n")[0].trim();
-  if (!clean) return "";
-  if (clean.startsWith("file://")) {
-    const u = new URL(clean);
-    const path = decodeURIComponent(u.pathname);
-    if (/^\/[A-Za-z]:\//.test(path)) {
-      return path.slice(1);
-    }
-    return path;
-  }
-  return "";
-}
-
-function tryResolveDroppedPath(event) {
-  const dt = event.dataTransfer;
-  if (!dt) return "";
-
-  const uriList = dt.getData("text/uri-list");
-  const fromUri = pathFromUri(uriList);
-  if (fromUri) return fromUri;
-
-  const plain = dt.getData("text/plain")?.trim() || "";
-  if (plain.endsWith(".html") || plain.endsWith(".htm")) return plain;
-
-  const first = dt.files && dt.files[0];
-  if (first && typeof first.path === "string" && first.path) {
-    return first.path;
-  }
-  return "";
-}
-
-function bindDropzone() {
-  const dz = dom.htmlDropzone;
-  if (!dz) return;
-
-  const onEnter = (ev) => {
-    ev.preventDefault();
-    dz.classList.add("dragover");
-  };
-  const onLeave = () => dz.classList.remove("dragover");
-  const onOver = (ev) => ev.preventDefault();
-  const onDrop = (ev) => {
-    ev.preventDefault();
-    dz.classList.remove("dragover");
-    const path = tryResolveDroppedPath(ev);
-    if (!path) {
-      showError("无法从拖拽中读取文件路径，请使用“选择 HTML 文件”。");
-      return;
-    }
-    dom.htmlPath.value = path;
-    setGlobalStatus("idle", "HTML dropped");
-  };
-
-  dz.addEventListener("dragenter", onEnter);
-  dz.addEventListener("dragover", onOver);
-  dz.addEventListener("dragleave", onLeave);
-  dz.addEventListener("drop", onDrop);
 }
 
 dom.btnPreview.addEventListener("click", () => startTask("preview"));
 dom.btnExport.addEventListener("click", () => startTask("export"));
-dom.btnOpenOutput.addEventListener("click", openOutputDir);
-dom.btnPickHtml.addEventListener("click", pickHtmlByDialog);
 dom.sizePreset.addEventListener("change", applySizePreset);
+if (dom.themePreset) {
+  dom.themePreset.addEventListener("change", () => {
+    if (!dom.themeColor) return;
+    const hex = themePresetMap[dom.themePreset.value];
+    if (hex) {
+      dom.themeColor.value = hex;
+    }
+  });
+}
+if (dom.themeColor) {
+  dom.themeColor.addEventListener("input", () => {
+    dom.themeColor.value = normalizeHexColor(dom.themeColor.value);
+    syncThemePresetFromColor();
+  });
+}
 
 bootstrap();
 loadParamMeta();
-bindDropzone();
+bindSourceDropzone();

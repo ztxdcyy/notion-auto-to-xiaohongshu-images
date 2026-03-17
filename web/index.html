@@ -10,7 +10,7 @@
   <header class="topbar">
     <div>
       <p class="eyebrow">Notion HTML to Mobile Images</p>
-      <h1>导出前预览 + 高清导出</h1>
+      <h1 id="postTitle">请先上传 HTML 源文件</h1>
     </div>
     <p id="globalStatus" class="status idle">Idle</p>
   </header>
@@ -19,92 +19,68 @@
     <aside class="panel controls">
       <h2>参数</h2>
       <form id="settingsForm">
-        <div class="group">
-          <h3>HTML 文件</h3>
-          <div id="htmlDropzone" class="dropzone" tabindex="0">
-            <p class="drop-title">拖拽 HTML 到这里</p>
-            <p class="drop-sub">或点击下面按钮从文件管理器选择</p>
-            <button id="btnPickHtml" type="button" class="ghost">选择 HTML 文件</button>
+        <div class="group upload-group">
+          <h3>上传源文件</h3>
+          <div id="sourceDropzone" class="upload-dropzone" tabindex="0">
+            <input id="sourceFile" type="file" accept=".zip,.html,.htm" hidden />
+            <p class="drop-main">拖拽 ZIP/HTML 到这里上传</p>
+            <button id="btnPickSource" type="button" class="ghost">选择文件</button>
           </div>
-          <label>
-            当前 HTML 路径
-            <input id="htmlPath" type="text" placeholder="/path/to/post.html" required readonly />
-          </label>
+          <div id="uploadProgressWrap" class="upload-progress-wrap hidden" aria-hidden="true">
+            <div class="upload-progress-track">
+              <div id="uploadProgressFill" class="upload-progress-fill"></div>
+            </div>
+            <div id="uploadProgressText" class="upload-progress-text">0%</div>
+          </div>
+          <p id="sourceMeta" class="upload-status">未上传</p>
         </div>
-        <label>
-          <span class="field-title">CSS 样式路径</span>
-          <input id="cssPath" type="text" placeholder="可留空，默认项目内 my.css" />
-        </label>
 
-        <details class="group collapsible" open>
-          <summary>导出图片选项</summary>
-          <div class="group-body">
-            <div class="grid2">
-              <label class="param-label" data-param-key="sizePreset">
-                <span class="field-title">尺寸预设</span>
-                <select id="sizePreset">
-                  <option value="1200x1600">1200 x 1600（3:4 常规图文）</option>
-                  <option value="1440x2400">1440 x 2400（满屏打开）</option>
-                </select>
-                <span class="help-dot" title="">?</span>
-              </label>
-              <label class="param-label" data-param-key="width">
-                <span class="field-title">宽度(px)</span>
-                <input id="width" type="number" min="1" readonly />
-                <span class="help-dot" title="">?</span>
-              </label>
-              <label class="param-label" data-param-key="height">
-                <span class="field-title">高度(px)</span>
-                <input id="height" type="number" min="1" readonly />
-                <span class="help-dot" title="">?</span>
-              </label>
-              <label class="param-label" data-param-key="sidePadding">
-                <span class="field-title">左右留白(px)</span>
-                <input id="sidePadding" type="number" min="0" />
-                <span class="help-dot" title="">?</span>
-              </label>
-              <label class="param-label" data-param-key="topPadding">
-                <span class="field-title">上留白(px)</span>
-                <input id="topPadding" type="number" min="0" />
-                <span class="help-dot" title="">?</span>
-              </label>
-              <label class="param-label" data-param-key="bottomPadding">
-                <span class="field-title">下留白(px)</span>
-                <input id="bottomPadding" type="number" min="0" />
-                <span class="help-dot" title="">?</span>
-              </label>
-              <label class="param-label" data-param-key="slicePadding">
-                <span class="field-title">切图上下留白(px)</span>
-                <input id="slicePadding" type="number" min="0" />
-                <span class="help-dot" title="">?</span>
-              </label>
-            </div>
-            <p id="ratioHint" class="field-hint">尺寸由预设固定，不再按比例自动计算。</p>
+        <div class="group">
+          <h3>导出图片选项</h3>
+          <div class="grid2">
+            <label class="param-label" data-param-key="sizePreset">
+              <span class="field-title">尺寸预设</span>
+              <select id="sizePreset">
+                <option value="1200x1600">1200 x 1600（3:4 常规图文）</option>
+                <option value="1440x2400">1440 x 2400（满屏打开）</option>
+              </select>
+              <span class="help-dot" title="">?</span>
+            </label>
+            <label class="param-label" data-param-key="previewSupersample">
+              <span class="field-title">预览清晰度(倍率)</span>
+              <input id="previewSupersample" type="number" step="0.1" min="0.5" value="1.2" />
+              <span class="help-dot" title="">?</span>
+            </label>
+            <label class="param-label" data-param-key="exportSupersample">
+              <span class="field-title">导出清晰度(倍率)</span>
+              <input id="exportSupersample" type="number" step="0.1" min="1" value="5.0" />
+              <span class="help-dot" title="">?</span>
+            </label>
+            <label class="param-label" data-param-key="exportSharpen">
+              <span class="field-title">导出锐化强度</span>
+              <input id="exportSharpen" type="number" min="0" value="120" />
+              <span class="help-dot" title="">?</span>
+            </label>
+            <label class="param-label" data-param-key="themePreset">
+              <span class="field-title">主题色预设</span>
+              <select id="themePreset">
+                <option value="classic_blue">经典蓝</option>
+                <option value="morandi_sage">莫兰迪鼠尾草绿</option>
+                <option value="morandi_bluegray">莫兰迪雾霾蓝</option>
+                <option value="morandi_rose">莫兰迪豆沙粉</option>
+                <option value="morandi_khaki">莫兰迪卡其灰</option>
+                <option value="custom">自定义</option>
+              </select>
+              <span class="help-dot" title="">?</span>
+            </label>
+            <label class="param-label" data-param-key="themeColor">
+              <span class="field-title">主题色取色器</span>
+              <input id="themeColor" class="color-input" type="color" value="#3d7eff" />
+              <span class="help-dot" title="">?</span>
+            </label>
           </div>
-        </details>
-
-        <details class="group collapsible" open>
-          <summary>导出参数选项</summary>
-          <div class="group-body">
-            <div class="grid2">
-              <label class="param-label" data-param-key="previewSupersample">
-                <span class="field-title">预览清晰度(倍率)</span>
-                <input id="previewSupersample" type="number" step="0.1" min="0.5" />
-                <span class="help-dot" title="">?</span>
-              </label>
-              <label class="param-label" data-param-key="exportSupersample">
-                <span class="field-title">导出清晰度(倍率)</span>
-                <input id="exportSupersample" type="number" step="0.1" min="1" />
-                <span class="help-dot" title="">?</span>
-              </label>
-              <label class="param-label" data-param-key="exportSharpen">
-                <span class="field-title">导出锐化强度</span>
-                <input id="exportSharpen" type="number" min="0" />
-                <span class="help-dot" title="">?</span>
-              </label>
-            </div>
-          </div>
-        </details>
+          <p id="ratioHint" class="field-hint">当前尺寸：1440 x 2400</p>
+        </div>
 
         <details class="group collapsible" open>
           <summary>切分策略选项</summary>
@@ -120,27 +96,27 @@
               </label>
               <label class="param-label" data-param-key="searchRange">
                 <span class="field-title">搜索范围(px)</span>
-                <input id="searchRange" type="number" min="0" />
+                <input id="searchRange" type="number" min="0" value="220" />
                 <span class="help-dot" title="">?</span>
               </label>
               <label class="param-label" data-param-key="minSegHeight">
                 <span class="field-title">最小分段高度(px)</span>
-                <input id="minSegHeight" type="number" min="1" />
+                <input id="minSegHeight" type="number" min="1" value="1500" />
                 <span class="help-dot" title="">?</span>
               </label>
               <label class="param-label" data-param-key="whiteThreshold">
                 <span class="field-title">空白阈值</span>
-                <input id="whiteThreshold" type="number" min="0" max="255" />
+                <input id="whiteThreshold" type="number" min="0" max="255" value="245" />
                 <span class="help-dot" title="">?</span>
               </label>
               <label class="param-label" data-param-key="whiteRowRatio">
                 <span class="field-title">空白行比例</span>
-                <input id="whiteRowRatio" type="number" step="0.001" min="0" max="1" />
+                <input id="whiteRowRatio" type="number" step="0.001" min="0" max="1" value="0.992" />
                 <span class="help-dot" title="">?</span>
               </label>
               <label class="param-label" data-param-key="waitMs">
                 <span class="field-title">额外等待(ms)</span>
-                <input id="waitMs" type="number" min="0" />
+                <input id="waitMs" type="number" min="0" value="800" />
                 <span class="help-dot" title="">?</span>
               </label>
             </div>
@@ -170,9 +146,6 @@
         <div><span>状态</span><strong id="taskState">-</strong></div>
         <div><span>页数</span><strong id="taskPages">-</strong></div>
         <div><span>输出目录</span><strong id="taskOutput">-</strong></div>
-      </div>
-      <div class="actions">
-        <button id="btnOpenOutput">打开输出目录</button>
       </div>
     </aside>
   </main>

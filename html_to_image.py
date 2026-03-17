@@ -5,9 +5,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import json
 import re
-import webbrowser
 from html import unescape
 from io import BytesIO
 from pathlib import Path
@@ -104,21 +102,32 @@ def parse_args() -> argparse.Namespace:
         help="Top/bottom white padding added to each output slice (px)",
     )
     parser.add_argument(
+        "--theme-color",
+        type=str,
+        default="#3d7eff",
+        help="Theme accent color in hex format (e.g. #3d7eff)",
+    )
+    parser.add_argument(
         "--max-pages",
         type=int,
         default=0,
         help="Maximum pages to export (0 means no limit)",
     )
+    # Backward-compatibility no-op:
+    # old web_app workers may still pass this flag.
     parser.add_argument(
         "--no-open-preview",
         action="store_true",
-        help="Do not auto-open preview page in browser",
+        help=argparse.SUPPRESS,
     )
     return parser.parse_args()
 
 
 def build_override_css(args: argparse.Namespace) -> str:
     return f"""
+:root {{
+  --theme-color: {args.theme_color} !important;
+}}
 html, body {{
   margin: 0 !important;
   padding: 0 !important;
@@ -169,162 +178,6 @@ def infer_post_title(html_path: Path) -> str:
     title = re.sub(r"\s+", " ", title).strip()
     title = re.sub(r'[\\/:*?"<>|]+', "_", title)
     return title or html_path.stem
-
-
-def write_live_preview_html(
-    preview_path: Path, image_base_uri: str, width: int, height: int
-) -> Path:
-    base_uri = image_base_uri.rstrip("/")
-    preview_path.write_text(
-        f"""<!doctype html>
-<html lang="zh-CN">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>分割预览</title>
-  <style>
-    :root {{
-      --bg: #f2efe9;
-      --card: #ffffff;
-      --text: #2e2a26;
-      --muted: #726b63;
-      --line: #d8d1c7;
-      --shadow: 0 8px 24px rgba(38, 30, 21, 0.12);
-    }}
-    * {{ box-sizing: border-box; }}
-    body {{
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      padding: 18px 14px 28px;
-    }}
-    header {{
-      position: sticky;
-      top: 0;
-      z-index: 2;
-      background: color-mix(in srgb, var(--bg) 92%, white);
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      box-shadow: var(--shadow);
-      padding: 12px 14px;
-      margin-bottom: 14px;
-      backdrop-filter: blur(4px);
-    }}
-    h1 {{
-      margin: 0 0 8px;
-      font-size: 18px;
-    }}
-    #status {{
-      margin: 0;
-      color: var(--muted);
-      font-size: 14px;
-      line-height: 1.4;
-    }}
-    #pages {{
-      display: grid;
-      gap: 14px;
-      justify-content: center;
-    }}
-    figure {{
-      margin: 0;
-      width: min(100%, 440px);
-      background: var(--card);
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 8px;
-      box-shadow: var(--shadow);
-    }}
-    img {{
-      display: block;
-      width: 100%;
-      height: auto;
-      border-radius: 8px;
-      background: #fff;
-    }}
-    figcaption {{
-      margin-top: 6px;
-      font-size: 12px;
-      color: var(--muted);
-      text-align: center;
-    }}
-  </style>
-</head>
-<body>
-  <header>
-    <h1>实时分割预览</h1>
-    <p id="status">等待第一张切片生成...</p>
-  </header>
-  <main id="pages"></main>
-  <script>
-    const imageBaseUri = {json.dumps(base_uri)};
-    const pageWidth = {width};
-    const pageHeight = {height};
-    const statusEl = document.getElementById("status");
-    const pagesEl = document.getElementById("pages");
-    let nextPage = 1;
-    let rendered = 0;
-    let missCount = 0;
-
-    function pad3(n) {{
-      return String(n).padStart(3, "0");
-    }}
-
-    function fileName(n) {{
-      return `page_${{pad3(n)}}.png`;
-    }}
-
-    function fileUrl(n) {{
-      return `${{imageBaseUri}}/${{fileName(n)}}`;
-    }}
-
-    function appendImage(pageNo) {{
-      const file = fileName(pageNo);
-      const url = fileUrl(pageNo);
-      const fig = document.createElement("figure");
-      const img = document.createElement("img");
-      img.src = `${{url}}?v=${{Date.now()}}`;
-      img.loading = "lazy";
-      img.width = pageWidth;
-      img.height = pageHeight;
-      const cap = document.createElement("figcaption");
-      cap.textContent = file;
-      fig.appendChild(img);
-      fig.appendChild(cap);
-      pagesEl.appendChild(fig);
-    }}
-
-    function pollNext() {{
-      const file = fileUrl(nextPage);
-      const probe = new Image();
-      probe.onload = () => {{
-        missCount = 0;
-        rendered += 1;
-        appendImage(nextPage);
-        statusEl.textContent = `已预览 ${{rendered}} 张，继续监听新切片...`;
-        nextPage += 1;
-        setTimeout(pollNext, 140);
-      }};
-      probe.onerror = () => {{
-        missCount += 1;
-        if (rendered === 0) {{
-          statusEl.textContent = "等待第一张切片生成...";
-        }} else {{
-          statusEl.textContent = `已预览 ${{rendered}} 张，等待下一张...`;
-        }}
-        setTimeout(pollNext, missCount < 6 ? 300 : 900);
-      }};
-      probe.src = `${{file}}?probe=${{Date.now()}}`;
-    }}
-
-    pollNext();
-  </script>
-</body>
-</html>
-""",
-        encoding="utf-8",
-    )
-    return preview_path
 
 
 def _best_white_row(gray_roi: Image.Image, threshold: int, ratio: float, target_row: int) -> int | None:
@@ -396,7 +249,7 @@ async def find_smart_cut(
     return cut
 
 
-async def export_pages(args: argparse.Namespace) -> tuple[Path, int, Path]:
+async def export_pages(args: argparse.Namespace) -> tuple[Path, int]:
     html_path = args.html.expanduser().resolve()
     if not html_path.is_file():
         raise FileNotFoundError(f"HTML not found: {html_path}")
@@ -414,27 +267,6 @@ async def export_pages(args: argparse.Namespace) -> tuple[Path, int, Path]:
 
     for old in out_dir.glob("page_*.png"):
         old.unlink()
-    stale_preview = out_dir / "preview_live.html"
-    if stale_preview.exists():
-        stale_preview.unlink()
-    preview_path = Path(__file__).resolve().parent / "preview_live.html"
-    preview_path = write_live_preview_html(
-        preview_path=preview_path,
-        image_base_uri=out_dir.as_uri(),
-        width=args.width,
-        height=args.height,
-    )
-    if args.no_open_preview:
-        print(f"Preview ready: {preview_path}")
-    else:
-        try:
-            if webbrowser.open(preview_path.as_uri(), new=1):
-                print(f"Preview opened in browser: {preview_path}")
-            else:
-                print(f"Preview ready (open manually if needed): {preview_path}")
-        except Exception as exc:
-            print(f"Warning: failed to auto-open preview: {exc}")
-
     async with async_playwright() as p:
         browser = await p.chromium.launch()
         page = await browser.new_page(
@@ -529,7 +361,7 @@ async def export_pages(args: argparse.Namespace) -> tuple[Path, int, Path]:
 
         await browser.close()
 
-    return out_dir, idx, preview_path
+    return out_dir, idx
 
 
 def main() -> int:
@@ -570,14 +402,16 @@ def main() -> int:
     if args.max_pages < 0:
         print("max-pages must be >= 0")
         return 1
+    if not re.fullmatch(r"#[0-9A-Fa-f]{6}", args.theme_color):
+        print("theme-color must be a hex color like #3d7eff")
+        return 1
     content_h = args.height - 2 * args.slice_padding
     if args.min_segment_height > content_h:
         print("min-segment-height must be <= content_height (height - 2*slice-padding)")
         return 1
 
-    out_dir, page_count, preview_path = asyncio.run(export_pages(args))
+    out_dir, page_count = asyncio.run(export_pages(args))
     print(f"Done. Exported {page_count} image(s) to {out_dir}")
-    print(f"Live preview: {preview_path}")
     print(
         "Final size per image: "
         f"{args.width}x{args.height} (fixed), supersample={args.supersample}"
@@ -594,6 +428,7 @@ def main() -> int:
         f"Cut mode: {args.cut_mode}, search_range={args.search_range}, "
         f"white_threshold={args.white_threshold}, white_row_ratio={args.white_row_ratio}"
     )
+    print(f"Theme color: {args.theme_color}")
     return 0
 
 
